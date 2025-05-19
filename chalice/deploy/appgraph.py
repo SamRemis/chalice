@@ -6,7 +6,7 @@ from typing import cast
 from typing import Dict, List, Tuple, Any, Set, Optional, Text, Union  # noqa
 
 from chalice.config import Config  # noqa
-from chalice import app
+from chalice import app, CacheClusterConfig
 from chalice.constants import LAMBDA_TRUST_POLICY
 from chalice.deploy import models
 from chalice.utils import UI  # noqa
@@ -217,6 +217,14 @@ class ApplicationGraphBuilder(object):
                 config.api_gateway_stage,
             )
 
+        cache_cluster_size = None
+        #TODO figure out what this file actually does; is it necessary to add this here?  Just based on a
+        # quick glance, I'm guessing that it is for recording the resources and settings for the chalice history
+        if cluster_config := config.api_gateway_cache_cluster:
+            #TODO validate the key somewhere?  This should stay a dictionary cause it can grow to include the enabled key
+            cache_cluster_config = CacheClusterConfig(cluster_config['size'])
+
+
         return models.RestAPI(
             resource_name='rest_api',
             swagger_doc=models.Placeholder.BUILD_STAGE,
@@ -229,6 +237,9 @@ class ApplicationGraphBuilder(object):
             domain_name=custom_domain_name,
             xray=config.xray_enabled,
             vpce_ids=vpce_ids,
+            #TODO confirm this is internal and we can change it later, otherwise we probably will want
+            # to think through the interface better.  It should be safe to assume it's internal though
+            cache_cluster = cache_cluster_config
         )
 
     def _get_default_private_api_policy(self, config: Config) -> StrMapAny:

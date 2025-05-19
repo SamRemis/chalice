@@ -1266,7 +1266,8 @@ class PlanStage(object):
                 method_name='deploy_rest_api',
                 params={'rest_api_id': Variable('rest_api_id'),
                         'xray': resource.xray,
-                        'api_gateway_stage': resource.api_gateway_stage},
+                        'api_gateway_stage': resource.api_gateway_stage,
+                        'cache_cluster': resource.cache_cluster,},
             ),
             models.StoreValue(
                 name='rest_api_url',

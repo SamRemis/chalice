@@ -386,6 +386,44 @@ class CORSConfig(object):
                 other.get_access_control_headers()
         return False
 
+class CacheClusterConfig(object):
+    """A cache cluster configuration to attach to a route or API Gateway."""
+    def __init__(self, cache_cluster_size: str = '0.5'):
+        # cache_cluster_size: The size of the cache cluster (e.g., '0.5', '1.6', '6.1', etc.)
+        self.cache_cluster_size = cache_cluster_size
+
+    def to_dict(self) -> dict:
+        return {
+            'cache_cluster_size': self.cache_cluster_size
+        }
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, self.__class__):
+            return self.cache_cluster_size == other.cache_cluster_size
+        return False
+
+
+class ApiCacheConfig(object):
+    """A cache configuration to attach to a route."""
+    def __init__(
+        self,
+        enabled: bool = False,
+        ttl: int = 300,
+        key_parameters: list = None,
+    ):
+        self.enabled = enabled
+        self.ttl = ttl
+        self.key_parameters = key_parameters or []
+
+    def __eq__(self, other):
+        if not isinstance(other, ApiCacheConfig):
+            return False
+        return (
+            self.enabled == other.enabled and
+            self.ttl == other.ttl and
+            self.key_parameters == other.key_parameters
+        )
+
 
 class Request(object):
     """The current request from API gateway."""
@@ -550,12 +588,7 @@ class Response(object):
 
 class RouteEntry(object):
 
-    def __init__(self, view_function: Callable[..., Any], view_name: str,
-                 path: str, method: str,
-                 api_key_required: Optional[bool] = None,
-                 content_types: Optional[List[str]] = None,
-                 cors: Optional[Union[bool, CORSConfig]] = False,
-                 authorizer: Optional[Authorizer] = None):
+    def __init__(self, view_function: Callable[..., Any], view_name: str, path: str, method: str, api_key_required: Optional[bool] = None, content_types: Optional[List[str]] = None, cors: Optional[Union[bool, CORSConfig]] = False, cache_config: Optional[Union[bool, ApiCacheConfig]] = False, authorizer: Optional[Authorizer] = None):
         self.view_function: Callable[..., Any] = view_function
         self.view_name: str = view_name
         self.uri_pattern: str = path
@@ -565,6 +598,7 @@ class RouteEntry(object):
         #: e.g, '/foo/{bar}/{baz}/qux -> ['bar', 'baz']
         self.view_args: List[str] = self._parse_view_args()
         self.content_types: List[str] = content_types or []
+
         # cors is passed as either a boolean or a CORSConfig object. If it is a
         # boolean it needs to be replaced with a real CORSConfig object to
         # pass the typechecker. None in this context will not inject any cors
@@ -575,6 +609,15 @@ class RouteEntry(object):
         elif cors is False:
             cors = None
         self.cors: CORSConfig = cors  # type: ignore
+        #TODO most of the cache_config was just copy/paste from the cors above; I need to go back
+        # and see what actually is needed here
+        if cache_config is True:
+            cache_config = ApiCacheConfig(enabled=True)
+        elif cache_config is False or cache_config is None:
+            cache_config = None
+        self.cache_config = cache_config
+
+
         self.authorizer: Optional[Authorizer] = authorizer
 
     def _parse_view_args(self) -> List[str]:
@@ -1195,7 +1238,20 @@ class _HandlerRegistration(object):
             'content_types': actual_kwargs.pop('content_types',
                                                ['application/json']),
             'cors': actual_kwargs.pop('cors', self.api.cors),
-        }
+            'cache_config': actual_kwargs.pop('cache_config', None),        }
+        #TODO this whole section of added code was done quick and hacky a few days ago;
+        # maybe it's good, but we should definitely come back and confirm this all
+        # behaves as expected and has the desired functionality
+        if not route_kwargs['cache_config']:
+            cache_enabled = actual_kwargs.pop('cache_enabled', None)
+            cache_ttl = actual_kwargs.pop('cache_ttl', None)
+            cache_key_parameters = actual_kwargs.pop('cache_key_parameters', None)
+            if cache_enabled or cache_ttl or cache_key_parameters:
+                route_kwargs['cache_config'] = ApiCacheConfig(
+                    enabled=cache_enabled if cache_enabled is not None else False,
+                    ttl=cache_ttl if cache_ttl is not None else 300,
+                    key_parameters=cache_key_parameters or [],
+                )
         if route_kwargs['cors'] is None:
             route_kwargs['cors'] = self.api.cors
         if not isinstance(route_kwargs['content_types'], list):

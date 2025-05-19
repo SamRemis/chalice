@@ -72,6 +72,17 @@ class SwaggerGenerator(object):
                 if 'security' in current:
                     self._add_to_security_definition(
                         current['security'], api, view)
+
+                cache_config = getattr(view, 'cache_config', None)
+                if cache_config and cache_config.enabled:
+                    apig_integ = current.get('x-amazon-apigateway-integration')
+                    #TODO this should always exist - should we delete the is_not_none check?
+                    if apig_integ is not None:
+                        if cache_config.key_parameters:
+                            apig_integ['cacheKeyParameters'] = cache_config.key_parameters
+                        apig_integ['caching'] = True
+                        apig_integ['cacheTtlInSeconds'] = cache_config.ttl
+
                 swagger_for_path[http_method.lower()] = current
                 if view.cors is not None:
                     cors_config = view.cors

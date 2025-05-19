@@ -5,6 +5,8 @@ import enum
 from typing import List, Dict, Optional as Opt, Any, TypeVar, Union, Set  # noqa
 from typing import cast
 
+from chalice import CacheClusterConfig
+
 
 class Placeholder(enum.Enum):
     BUILD_STAGE = 'build_stage'
@@ -283,6 +285,7 @@ class RestAPI(ManagedModel):
     authorizers: List[LambdaFunction] = field(default_factory=list)
     domain_name: Opt[DomainName] = None
     vpce_ids: Opt[List[str]] = None
+    cache_cluster: Opt[CacheClusterConfig] = None
 
     def dependencies(self) -> List[Model]:
         resources: List[Model] = []

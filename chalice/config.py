@@ -172,6 +172,10 @@ class Config(object):
     def api_gateway_custom_domain(self) -> StrMap:
         return self._chain_lookup('api_gateway_custom_domain',
                                   varies_per_chalice_stage=True)
+    @property
+    def api_gateway_cache_cluster(self) -> StrMap:
+        return self._chain_lookup('api_gateway_cache_cluster',
+                                  varies_per_chalice_stage=True)
 
     @property
     def websocket_api_custom_domain(self) -> StrMap:

@@ -50,7 +50,13 @@ from botocore.vendored.requests import (
 from botocore.vendored.requests.exceptions import (
     ReadTimeout as RequestsReadTimeout,
 )
-from typing import TypedDict
+
+from chalice import CacheClusterConfig
+
+try:
+    from typing import TypedDict
+except ImportError:
+    from typing_extensions import TypedDict
 
 from chalice.constants import DEFAULT_STAGE_NAME
 from chalice.constants import MAX_LAMBDA_DEPLOYMENT_SIZE
@@ -1205,14 +1211,30 @@ class TypedAWSClient(object):
             raise ResourceDoesNotExistError(rest_api_id)
 
     def deploy_rest_api(
-        self, rest_api_id: str, api_gateway_stage: str, xray: bool
+        self, rest_api_id: str, api_gateway_stage: str, xray: bool, cache_cluster: CacheClusterConfig
     ) -> None:
         client = self._client('apigateway')
         client.create_deployment(
             restApiId=rest_api_id,
             stageName=api_gateway_stage,
             tracingEnabled=bool(xray),
+            #TODO handle cache_cluster being None here
+            cacheClusterSize = cache_cluster.cache_cluster_size,
+            cacheClusterEnabled = cache_cluster is not None
         )
+
+    # Okay looks like it's time to call it quits- hackathon is over.  Writing the current context here:
+    # - This is mostly functional, but needs a lot of cleanup and testing still.  There are a number of TODOS
+    #    throughout the code that say what needs to be looked at more closely.  This was my first time trying to
+    #    add a feature to chalice, so it's likely I missed more
+    # - We still need to enable route caching on all get requests by default- something like app.api.caching = "ENABLED"
+    # - We should probably raise an error if a route explicitly disables caching, but has other configurations - for example:
+    #    `@app.route('/cached/{id}', cache_config=ApiCacheConfig(enabled=False, ttl=120, key_parameters=['method.request.path.id']))`
+    # - We should probably raise an error if a cache is set without cache cluster being enabled in the config.json file of the
+    #    application.  This will set the routes to enable caching but will not actually cache anything, which seems like
+    #    behavior that most customers would be surprised by.  Blame APIGW's weird API for this.  Or maybe blame me for not
+    #    understanding the reasoning behind the design.
+    # - Similarly, we should validate the value of the cache cluster size since it's effectively an enum
 
     def add_permission_for_apigateway(
         self,
